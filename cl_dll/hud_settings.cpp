@@ -135,5 +135,68 @@ int CHudSettings::MsgFunc_Settings(const char* name, int size, void* buf)
 	discord_integration::set_gamemode(gamemode);
 	discord_integration::set_match_is_on(match_is_on);
 
+
+
+#define _printf gEngfuncs.Con_Printf
+	_printf("%s\n", gamemode);
+
+	static char last_gamemode[ARRAYSIZE(gamemode) + 1]{};
+
+	if (!strstr(last_gamemode, gamemode)) // Execute a userconfig if the gamemode has changed
+	{
+		_printf("weszlo\n");
+		FILE* fp = NULL;
+
+		char filename[ARRAYSIZE(gamemode) + 16];
+		filename[ARRAYSIZE(filename) - 1] = '\0';
+
+		char cmd[ARRAYSIZE(filename) + sizeof(char) * 6];
+		cmd[ARRAYSIZE(cmd) - 1] = '\0';
+
+		snprintf(filename, ARRAYSIZE(filename) - 1, "%s_userconfig.cfg", gamemode);
+
+		fp = fopen(filename, "r");
+
+		if (fp) // Check if the gamemode-specific userconfig exists, if so - execute it
+		{
+			fclose(fp);
+
+			snprintf(cmd, ARRAYSIZE(cmd) - 1, "exec %s", filename);
+			_printf("%s\n", cmd);
+			gEngfuncs.pfnClientCmd(cmd);
+		}
+		else
+		{
+			if (![&cmd, &fp, this]() mutable -> bool { // Returns true if the current gamemode is DM-like and dm_userconfig.cfg has been executed
+				fp = fopen("dm_userconfig.cfg", "r");
+
+				if (fp == NULL) // If this file doesn't exist theres no point in checking if the current gamemode is DM-like
+					return false;
+
+				fclose(fp);
+					
+				const std::vector<std::string> dm_gamemodes = {
+					"HLCCL", "AG TDM", "AG Arcade", "LLHL", "Agt"
+				};
+
+				for (const std::string& gm : dm_gamemodes)
+				{
+					if (strstr(gm.c_str(), gamemode))
+					{
+						strncpy(cmd, "exec dm_userconfig.cfg", ARRAYSIZE(cmd) - 1);
+						gEngfuncs.pfnClientCmd(cmd);
+						return true;
+					}
+				}
+				return false; }())
+			{
+				gEngfuncs.pfnClientCmd("exec userconfig.cfg"); // dm_userconfig.cfg missing or unknown gamemode
+				_printf("ex usrc.cfg\n");
+			}
+		}
+
+		strncpy(last_gamemode, gamemode, ARRAYSIZE(last_gamemode) - 1);
+	}
+
 	return 1;
 }
